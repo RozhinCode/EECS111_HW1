@@ -39,6 +39,9 @@ ParallelMergeSorter::ParallelMergeSorter(vector<student> &original_list, int num
 
 // This function will be called by each child process to perform multithreaded sorting
 vector<student> ParallelMergeSorter::run_sort() {
+  vector<pthread_t> threads(num_threads);
+  vector<vector<student> > sorted_sublists(num_threads);
+
   for (int i = 0; i < num_threads; i++) {
     // We have to use the heap for this otherwise args will be destructed in each iteration,
     // and the thread will not have the correct args struct
@@ -46,15 +49,21 @@ vector<student> ParallelMergeSorter::run_sort() {
 
     /*
      * Uncomment this code for testing sorting without threads
-     * 
-     * thread_init((void *) args);
-     */
+     *    */
+    thread_init((void *) args);
+  
 
 
     // Your implementation goes here, you will need to implement:
     // Creating worker threads
     //  - Each worker thread will use ParallelMergeSorter::thread_init as its start routine
-    //
+     pthread_create(&threads[i], NULL, &ParallelMergeSorter::thread_init, (void *) args);
+
+    //  - Each worker thread will use ParallelMergeSorter::thread_init as its start routine
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
     //  - Since the args are taken in as a void *, you will need to use
     //  the MergeSortArgs struct to pass multiple parameters (pass a pointer to the struct)
     //
@@ -72,6 +81,13 @@ vector<student> ParallelMergeSorter::run_sort() {
 void ParallelMergeSorter::merge_sort(int lower, int upper) {
   // Your implementation goes here, you will need to implement:
   // Top-down merge sort
+   if (lower < upper) {
+        int mid = (lower + upper) / 2;
+        merge_sort(lower, mid);
+        merge_sort(mid + 1, upper);
+        merge(lower, mid, upper);
+    }
+
 }
 
 // Standard merge implementation for merge sort
@@ -109,7 +125,9 @@ void * ParallelMergeSorter::thread_init(void * args) {
   //  - The range of merge sort is typically [lower, upper), lower inclusive, upper exclusive
   //
   //  - Remember to make sure all elements are included in the sort, integer division rounds down
-  //
+  int lower = thread_index * work_per_thread;
+  int upper = (thread_index == ctx->num_threads - 1) ? ctx->sorted_list.size() : (thread_index + 1) * work_per_thread;
+
   // Running merge sort
   //  - The provided functions assume a top-down implementation
   //
@@ -117,8 +135,10 @@ void * ParallelMergeSorter::thread_init(void * args) {
   //
   //  - It may make sense to equivalate this function as the non recursive "helper function" that merge sort normally has
 
+  // Perform merge sort on the sublist
+  ctx->merge_sort(lower, upper);
+
   // Free the heap allocation
   delete sort_args;
   return NULL;
 }
-
